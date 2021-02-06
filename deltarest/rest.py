@@ -10,7 +10,7 @@ class ParsedURI:
 
 
 class URIParser:
-    uri_pattern = r"(/tables)(/[a-zA-Z_]+)?(/query\?sql=[\\n ]*(.*))?"
+    uri_pattern = r"/tables/([a-zA-Z_]+)?(/query\?sql=[\\n ]*(.*))?"
 
     @classmethod
     def parse(cls, uri):
@@ -23,8 +23,8 @@ class URIParser:
                 f"unvalid URI '{uri}'. Must match pattern: '{cls.uri_pattern}'"
             )
         else:
-            table_name = match.group(2)
-            query_sql = match.group(4)
+            table_name = match.group(1)
+            query_sql = match.group(3)
             if query_sql is not None and \
                     not query_sql.lower().startswith("select"):
                 raise RuntimeError(
@@ -55,13 +55,8 @@ class DeltaRESTAdapter:
             if parsed_uri.query_sql is None:
                 return ResponseFormatter.to_json_payload(table)
             else:
-                table.registerTempTable(parsed_uri.table_name)
-                self.spark.sql(
-                    parsed_uri.query_sql.replace(
-                        parsed_uri.table_name,
-                        f"global_temp.{parsed_uri.table_name}"
-                    )
-                )
+                table.createOrReplaceTempView(parsed_uri.table_name)
+                self.spark.sql(parsed_uri.query_sql)
 
         else:
             raise RuntimeError("Currently unsupported")

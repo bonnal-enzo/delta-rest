@@ -36,6 +36,7 @@ class Test(unittest.TestCase):
             .save(f"{self.root_dir}/test_delta")
 
     def test_get(self):
+        # get full table
         self.spark \
             .range(1, 2) \
             .selectExpr("id as a", "id * 2 as b") \
