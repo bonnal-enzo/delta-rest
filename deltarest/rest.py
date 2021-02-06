@@ -10,7 +10,7 @@ class ParsedURI:
 
 
 class URIParser:
-    uri_pattern = r"/tables/([a-zA-Z_]+)?(/query\?sql=[\\n ]*(.*))?"
+    uri_pattern = r"/tables/([a-zA-Z_]+)?(/query\?sql=[\n ]*(.*))?"
 
     @classmethod
     def parse(cls, uri):
@@ -34,8 +34,8 @@ class URIParser:
 
 class ResponseFormatter:
     @staticmethod
-    def to_json_payload(rdd: DataFrame) -> str:
-        return f'{{"rows": [{",".join(rdd.toJSON().collect())}]}}'
+    def to_json_payload(table: DataFrame) -> str:
+        return f'{{"rows":[{",".join(table.toJSON().collect())}]}}'
 
 class DeltaRESTAdapter:
     def __init__(self, delta_storage_root: str):
@@ -56,7 +56,9 @@ class DeltaRESTAdapter:
                 return ResponseFormatter.to_json_payload(table)
             else:
                 table.createOrReplaceTempView(parsed_uri.table_name)
-                self.spark.sql(parsed_uri.query_sql)
+                return ResponseFormatter.to_json_payload(
+                    self.spark.sql(parsed_uri.query_sql)
+                )
 
         else:
             raise RuntimeError("Currently unsupported")

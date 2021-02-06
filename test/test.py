@@ -39,12 +39,22 @@ class Test(unittest.TestCase):
         # get full table
         self.spark \
             .range(1, 2) \
-            .selectExpr("id as a", "id * 2 as b") \
+            .selectExpr("id as a", "array(1, 2) as b") \
             .write \
             .format("delta") \
             .save(f"{self.root_dir}/test_get")
 
         self.assertEqual(
-            '{"rows": [{"a":1,"b":2}]}',
+            '{"rows":[{"a":1,"b":[1,2]}]}',
             DeltaRESTAdapter(self.root_dir).get("/tables/test_get")
+        )
+
+        # get with query on a table
+
+        self.assertEqual(
+            '{"rows":[{"count":1}]}',
+            DeltaRESTAdapter(self.root_dir).get(
+                """/tables/test_get/query?sql=
+                SELECT count(b) as count FROM test_get GROUP BY a"""
+            )
         )
