@@ -2,19 +2,20 @@ import unittest
 
 import sys
 import time
-import os
 
 sys.path.append("..")
 
-from deltarest import *
+from deltarest import DeltaRESTAdapter, DeltaRESTService
 
 from pyspark.sql import SparkSession
 
 
 class Test(unittest.TestCase):
-    root_dir = f"/tmp/delta_rest_test_{int(time.time())}"
+    root_dir: str = f"/tmp/delta_rest_test_{int(time.time())}"
 
     spark: SparkSession = None
+
+    dra: DeltaRESTAdapter
 
     @classmethod
     def setUpClass(cls):
@@ -24,33 +25,65 @@ class Test(unittest.TestCase):
             .master("local") \
             .config("spark.jars.packages", "io.delta:delta-core_2.12:0.8.0") \
             .getOrCreate()
+        cls.dra = DeltaRESTAdapter(cls.root_dir, 10)
 
     @classmethod
     def tearDownClass(cls):
         cls.spark.stop()
         # os.rmdir(cls.root_dir)
 
-    def test_delta(self):
-        self.spark \
-            .range(1) \
-            .write \
-            .format("delta") \
-            .save(f"{self.root_dir}/test_delta")
-
-    def test_get(self):
-        # get full table
-        self.spark \
-            .range(1, 2) \
-            .selectExpr("id as a", "array(1, 2) as b") \
-            .write \
-            .format("delta") \
-            .save(f"{self.root_dir}/test_get")
+    def test_scenario(self):
+        # PUT
 
         self.assertEqual(
-            '{"rows":[{"a":1,"b":[1,2]}]}',
+            '{"message":"Table foo created"}',
+            bytes.decode(self.dra.put("/tables/foo").response[0], "utf-8")
+        )
+
+        self.assertEqual(
+            '{"message":"Table foo already exists"}',
+            bytes.decode(self.dra.put("/tables/foo").response[0], "utf-8")
+        )
+
+        self.assertEqual(
+            '{"message":"Table bar created"}',
+            bytes.decode(self.dra.put("/tables/bar").response[0], "utf-8")
+        )
+
+        # POST
+
+        self.assertEqual(
+            '{"message":"Rows created"}',
+            bytes.decode(self.dra.post(
+                "/tables/foo",
+                {"rows": [
+                    {"id": 1, "collection": [1, 2]},
+                    {"id": 2, "collection": [3, 4]}
+                ]}
+            ).response[0], "utf-8")
+        )
+
+        # post rows in a table not created yet
+
+        self.assertEqual(
+            '{"message":"Table foo_ not found"}',
+            bytes.decode(self.dra.post(
+                "/tables/foo_",
+                {"rows": [
+                    {"id": 1, "collection": [1, 2]},
+                    {"id": 2, "collection": [3, 4]}
+                ]}
+            ).response[0], "utf-8")
+        )
+
+        # GET
+
+        # get full table
+
+        self.assertEqual(
+            '{"rows":[{"id":1,"collection":[1,2]},{"id":2,"collection":[3,4]}]}',
             bytes.decode(
-                DeltaRESTAdapter(self.root_dir).get(
-                    "/tables/test_get").response[0],
+                self.dra.get("/tables/foo").response[0],
                 "utf-8"
             )
         )
@@ -58,11 +91,13 @@ class Test(unittest.TestCase):
         # get with query on a table
 
         self.assertEqual(
-            '{"rows":[{"count":1}]}',
+            '{"rows":[{"count":2,"collections_concat_size":4}]}',
             bytes.decode(
-                DeltaRESTAdapter(self.root_dir).get(
-                    """/tables/test_get?sql=SELECT count(b) as count 
-                    FROM test_get GROUP BY a"""
+                self.dra.get(
+                    """/tables/foo?sql=SELECT
+                    count(*) as count,
+                    sum(size(collection)) as collections_concat_size
+                    FROM foo"""
                 ).response[0],
                 "utf-8"
             )
@@ -70,20 +105,13 @@ class Test(unittest.TestCase):
 
         # get with query on tables
 
-        self.spark \
-            .range(1, 2) \
-            .selectExpr("id as a", "array(1, 2) as b") \
-            .write \
-            .format("delta") \
-            .save(f"{self.root_dir}/test_get2")
-
         self.assertEqual(
-            '{"rows":[{"u":[1,2,1,2]}]}',
+            '{"rows":[{"count":4}]}',
             bytes.decode(
-                DeltaRESTAdapter(self.root_dir).get(
+                self.dra.get(
                     """/tables?sql=SELECT 
-                      concat(t1.b, t2.b) as u 
-                    FROM test_get as t1 JOIN test_get2 as t2 ON t1.a = t2.a 
+                      count(*) as count
+                    FROM foo as t1 CROSS JOIN foo as t2
                     LIMIT 100"""
                 ).response[0],
                 "utf-8"
@@ -91,10 +119,14 @@ class Test(unittest.TestCase):
         )
 
         # get tables names listing
+
         self.assertEqual(
-            '{"table_names":["test_get2","test_get"]}',
+            '{"tables":["bar","foo"]}',
             bytes.decode(
-                DeltaRESTAdapter(self.root_dir).get("/tables").response[0],
+                self.dra.get("/tables").response[0],
                 "utf-8"
             )
         )
+
+    # def test_service(self):
+    #     DeltaRESTService(self.root_dir).run("localhost", "4444")
