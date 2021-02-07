@@ -221,10 +221,10 @@ class DeltaRESTAdapter:
     def get(self, uri: str) -> Response:
         try:
             parsed_uri = _URIParser.parse(uri)
-            folder_names_list = self.fs_util.list(self.delta_storage_root)
+            statuses_names_list = self.fs_util.list(self.delta_storage_root)
 
             if parsed_uri.table_identifier is not None:
-                if parsed_uri.table_identifier not in folder_names_list:
+                if parsed_uri.table_identifier not in statuses_names_list:
                     return _ResponseFormatter.table_not_found(
                         parsed_uri.table_identifier
                     )
@@ -250,7 +250,7 @@ class DeltaRESTAdapter:
             else:
                 if parsed_uri.query_sql is None:
                     return _ResponseFormatter.tables_list(
-                        folder_names_list
+                        statuses_names_list
                     )
                 else:
                     for table_identifier in _SQLParser.extract_identifiers(

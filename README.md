@@ -13,10 +13,18 @@ pip install deltarest
 ```
 
 ## Run Flask service
-This service has to be running in the *Spark driver* (*client* deployment mode).
+This service has to be running in the *Spark driver* (`spark-submit` in *client* deployment mode).
 
 ```python
 from deltarest import DeltaRESTService
+from pyspark.sql import SparkSession
+
+SparkSession \
+    .builder \
+    .appName("local_test") \
+    .master("local") \
+    .config("spark.jars.packages", "io.delta:delta-core_2.12:0.8.0") \
+    .getOrCreate()
 
 DeltaRESTService("gs://lakehouse-bucket/tables_root_path").run("localhost", "4444")
 ```
