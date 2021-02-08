@@ -6,7 +6,7 @@
 
 **(Help and pull requests are very welcome !)**
 
-# Usage
+# Local usage example
 ## Install
 ```bash
 pip install deltarest
@@ -19,17 +19,20 @@ This service has to be running in the *Spark driver* (`spark-submit` in *client*
 from deltarest import DeltaRESTService
 from pyspark.sql import SparkSession
 
+# Create local SparkSession
 SparkSession \
     .builder \
-    .appName("local_test") \
+    .appName("local_deltarest_test") \
     .master("local") \
     .config("spark.jars.packages", "io.delta:delta-core_2.12:0.8.0") \
     .getOrCreate()
 
-
-DeltaRESTService(delta_root_path="s3://bucket-name/lakehouse-root") \
+# Start service on port 4444
+DeltaRESTService(delta_root_path="/tmp/lakehouse-root") \
     .run("0.0.0.0", "4444")
 ```
+
+Note: When deployed on cluster, `delta_root_path` could be a cloud storage path. 
 
 ## PUT
 ### Create Delta table with a specific identifier (evolutive schema)
