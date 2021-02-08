@@ -2,19 +2,20 @@
 [![Actions Status](https://github.com/enzobnl/delta-rest/workflows/test/badge.svg)](https://github.com/enzobnl/delta-rest/actions) [![Actions Status](https://github.com/enzobnl/delta-rest/workflows/PyPI/badge.svg)](https://github.com/enzobnl/delta-rest/actions)
 
 
-*Interact with Delta Lake through a RESTful API.*
+***Interact with [Delta Lake](https://github.com/delta-io/delta) through a RESTful API.***
 
-**(Help and pull requests are very welcome !)**
+*DeltaREST* is a Python library that allows you to easily launch inside your [Spark](https://github.com/apache/spark/) *driver* process a [Flask](https://github.com/pallets/flask) -based server exposing a RESTful API to interact with Delta tables.
 
-# Local usage example
+
+*(Help and pull requests are very welcome !)*
+
+# Example in local
 ## Install
 ```bash
 pip install deltarest
 ```
 
-## Run Flask service
-This service has to be running in the *Spark driver* (`spark-submit` in *client* deployment mode).
-
+## Run service
 ```python
 from deltarest import DeltaRESTService
 from pyspark.sql import SparkSession
@@ -32,7 +33,10 @@ DeltaRESTService(delta_root_path="/tmp/lakehouse-root") \
     .run("0.0.0.0", "4444")
 ```
 
-Note: When deployed on cluster, `delta_root_path` could be a cloud storage path. 
+Notes:
+When deployed on cluster: 
+- `delta_root_path` could be a cloud storage path. 
+- run `spark-submit` using `client` deployMode.
 
 ## PUT
 ### Create Delta table with a specific identifier (evolutive schema)
