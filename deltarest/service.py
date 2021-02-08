@@ -7,11 +7,11 @@ from .rest import DeltaRESTAdapter
 
 class DeltaRESTService(Flask):
     def __init__(self,
-                 delta_storage_root: str,
+                 delta_root_path: str,
                  max_response_n_rows: int = 100):
         super().__init__(__name__)
         self.rest_adapter = DeltaRESTAdapter(
-            delta_storage_root,
+            delta_root_path,
             max_response_n_rows
         )
 

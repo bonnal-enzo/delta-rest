@@ -26,7 +26,8 @@ SparkSession \
     .config("spark.jars.packages", "io.delta:delta-core_2.12:0.8.0") \
     .getOrCreate()
 
-DeltaRESTService("gs://lakehouse-bucket/tables_root_path").run("localhost", "4444")
+
+DeltaRESTService(delta_root_path="s3://lakehouse-bucket/tables_root_path").run("localhost", "4444")
 ```
 
 ## PUT
