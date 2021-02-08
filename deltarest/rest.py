@@ -159,9 +159,7 @@ class DeltaRESTAdapter:
     def __init__(self, delta_storage_root: str, max_response_n_rows: int):
         self.delta_storage_root = delta_storage_root
         self.max_response_n_rows = max_response_n_rows
-        self.spark = SparkSession.builder\
-            .config("spark.sql.jsonGenerator.ignoreNullFields", "false")\
-            .getOrCreate()
+        self.spark = SparkSession.builder.getOrCreate()
         self.fs_util = _HadoopFSUtil(
             self.spark.sparkContext._jvm,
             self.spark.sparkContext._jsc.hadoopConfiguration()
@@ -194,7 +192,7 @@ class DeltaRESTAdapter:
         except Exception as e:
             print(e)
             return _ResponseFormatter.bad_request(
-                str(e).replace('"', "'")[:self.max_response_n_rows]
+                str(e).replace('"', "'").split("\n")[:self.max_response_n_rows]
             )
 
     def post(self, uri: str, payload: dict):
@@ -241,7 +239,7 @@ class DeltaRESTAdapter:
         except Exception as e:
             print(e)
             return _ResponseFormatter.bad_request(
-                str(e).replace('"', "'")[:self.max_response_n_rows]
+                str(e).replace('"', "'").split("\n")[:self.max_response_n_rows]
             )
 
     def get(self, uri: str) -> Response:
@@ -297,5 +295,5 @@ class DeltaRESTAdapter:
         except Exception as e:
             print(e)
             return _ResponseFormatter.bad_request(
-                str(e).replace('"', "'")[:self.max_response_n_rows]
+                str(e).replace('"', "'").split("\n")[:self.max_response_n_rows]
             )

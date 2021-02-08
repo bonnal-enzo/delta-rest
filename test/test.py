@@ -24,6 +24,7 @@ class Test(unittest.TestCase):
             .appName("unit_tests") \
             .master("local") \
             .config("spark.jars.packages", "io.delta:delta-core_2.12:0.8.0") \
+            .config("spark.sql.jsonGenerator.ignoreNullFields", "false") \
             .getOrCreate()
         cls.dra = DeltaRESTAdapter(cls.root_dir, 10)
 
@@ -57,8 +58,20 @@ class Test(unittest.TestCase):
             bytes.decode(self.dra.post(
                 "/tables/foo",
                 {"rows": [
-                    {"id": 1, "collection": [1, 2]},
-                    {"id": 2, "collection": [3, 4]}
+                    {"id": 1},
+                    {"id": 2}
+                ]}
+            ).response[0], "utf-8")
+        )
+
+        # schema merging
+        self.assertEqual(
+            '{"message":"Rows created"}',
+            bytes.decode(self.dra.post(
+                "/tables/foo",
+                {"rows": [
+                    {"collection": [1, 2]},
+                    {"collection": [3, 4]}
                 ]}
             ).response[0], "utf-8")
         )
@@ -81,7 +94,9 @@ class Test(unittest.TestCase):
         # get full table
 
         self.assertEqual(
-            '{"rows":[{"id":1,"collection":[1,2]},{"id":2,"collection":[3,4]}]}',
+            '{"rows":[{"id":null,"collection":[1,2]},' +
+            '{"id":null,"collection":[3,4]},' +
+            '{"id":1,"collection":null},{"id":2,"collection":null}]}',
             bytes.decode(
                 self.dra.get("/tables/foo").response[0],
                 "utf-8"
@@ -95,8 +110,8 @@ class Test(unittest.TestCase):
             bytes.decode(
                 self.dra.get(
                     """/tables/foo?sql=SELECT
-                    count(*) as count,
-                    sum(size(collection)) as collections_concat_size
+                    count(id) as count,
+                    sum(size(ifnull(collection, array()))) as collections_concat_size
                     FROM foo"""
                 ).response[0],
                 "utf-8"
@@ -106,7 +121,7 @@ class Test(unittest.TestCase):
         # get with query on tables
 
         self.assertEqual(
-            '{"rows":[{"count":4}]}',
+            '{"rows":[{"count":16}]}',
             bytes.decode(
                 self.dra.get(
                     """/tables?sql=SELECT 
@@ -128,5 +143,5 @@ class Test(unittest.TestCase):
             )
         )
 
-    def test_service(self):
-        DeltaRESTService(self.root_dir).run("localhost", "4444")
+    # def test_service(self):
+    #     DeltaRESTService(self.root_dir).run("localhost", "4444")
