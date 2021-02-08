@@ -159,7 +159,9 @@ class DeltaRESTAdapter:
     def __init__(self, delta_storage_root: str, max_response_n_rows: int):
         self.delta_storage_root = delta_storage_root
         self.max_response_n_rows = max_response_n_rows
-        self.spark = SparkSession.builder.getOrCreate()
+        self.spark = SparkSession.builder\
+            .config("spark.sql.jsonGenerator.ignoreNullFields", "false")\
+            .getOrCreate()
         self.fs_util = _HadoopFSUtil(
             self.spark.sparkContext._jvm,
             self.spark.sparkContext._jsc.hadoopConfiguration()
@@ -168,55 +170,79 @@ class DeltaRESTAdapter:
             self.fs_util.mkdir(self.delta_storage_root)
 
     def put(self, uri):
-        parsed_uri = _URIParser.parse(uri)
-        if parsed_uri.table_identifier is None:
-            raise RuntimeError(
-                "PUT must be called on route like /tables/<table_identifier>"
+        try:
+            parsed_uri = _URIParser.parse(uri)
+            if parsed_uri.table_identifier is None:
+                raise RuntimeError(
+                    "PUT must be called on route like /tables/<table_identifier>"
+                )
+            if parsed_uri.query_sql is not None:
+                raise RuntimeError(
+                    "PUT does not support sql query arg"
+                )
+            if parsed_uri.table_identifier in \
+                    self.fs_util.list(self.delta_storage_root):
+                return _ResponseFormatter.table_already_exists(
+                    parsed_uri.table_identifier)
+            else:
+                self.fs_util.mkdir(
+                    f"{self.delta_storage_root}/{parsed_uri.table_identifier}"
+                )
+                return _ResponseFormatter.table_created(
+                    parsed_uri.table_identifier)
+
+        except Exception as e:
+            print(e)
+            return _ResponseFormatter.bad_request(
+                str(e).replace('"', "'")[:self.max_response_n_rows]
             )
-        if parsed_uri.query_sql is not None:
-            raise RuntimeError(
-                "PUT does not support sql query arg"
-            )
-        if parsed_uri.table_identifier in \
-                self.fs_util.list(self.delta_storage_root):
-            return _ResponseFormatter.table_already_exists(
-                parsed_uri.table_identifier)
-        else:
-            self.fs_util.mkdir(
-                f"{self.delta_storage_root}/{parsed_uri.table_identifier}"
-            )
-            return _ResponseFormatter.table_created(parsed_uri.table_identifier)
 
     def post(self, uri: str, payload: dict):
-        parsed_uri = _URIParser.parse(uri)
-        if parsed_uri.table_identifier is None:
-            raise RuntimeError(
-                "POST must be called on route like /tables/<table_identifier>"
+        try:
+            parsed_uri = _URIParser.parse(uri)
+            if parsed_uri.table_identifier is None:
+                raise RuntimeError(
+                    "POST must be called on route like /tables/<table_identifier>"
+                )
+            if parsed_uri.query_sql is not None:
+                raise RuntimeError(
+                    "POST does not support sql query arg"
+                )
+
+            if parsed_uri.table_identifier not in \
+                    self.fs_util.list(self.delta_storage_root):
+                return _ResponseFormatter.table_not_found(
+                    parsed_uri.table_identifier
+                )
+            if payload is None:
+                raise RuntimeError(
+                    "POST request with non valid json payload found"
+                )
+            if "rows" not in payload:
+                raise RuntimeError(
+                    "POST json payload must contain an array field named 'rows'"
+                )
+
+            rows: list = payload["rows"]
+            columns = rows[0].keys()
+
+            self.spark.sparkContext \
+                .parallelize([list(row.values()) for row in rows]) \
+                .toDF() \
+                .selectExpr([f"_{i + 1} as {k}" for i, k in enumerate(columns)]) \
+                .write.option("mergeSchema", "true") \
+                .format("delta") \
+                .mode("append") \
+                .save(
+                f"{self.delta_storage_root}/{parsed_uri.table_identifier}")
+
+            return _ResponseFormatter.post_done
+
+        except Exception as e:
+            print(e)
+            return _ResponseFormatter.bad_request(
+                str(e).replace('"', "'")[:self.max_response_n_rows]
             )
-        if parsed_uri.query_sql is not None:
-            raise RuntimeError(
-                "POST does not support sql query arg"
-            )
-
-        if parsed_uri.table_identifier not in \
-                self.fs_util.list(self.delta_storage_root):
-            return _ResponseFormatter.table_not_found(
-                parsed_uri.table_identifier
-            )
-
-        rows: list = payload["rows"]
-        columns = rows[0].keys()
-
-        self.spark.sparkContext \
-            .parallelize([list(row.values()) for row in rows]) \
-            .toDF() \
-            .selectExpr([f"_{i + 1} as {k}" for i, k in enumerate(columns)]) \
-            .write.option("mergeSchema", "true") \
-            .format("delta") \
-            .mode("append") \
-            .save(f"{self.delta_storage_root}/{parsed_uri.table_identifier}")
-
-        return _ResponseFormatter.post_done
 
     def get(self, uri: str) -> Response:
         try:
@@ -269,6 +295,7 @@ class DeltaRESTAdapter:
                     )
 
         except Exception as e:
+            print(e)
             return _ResponseFormatter.bad_request(
-                str(e).replace('"', "'").split("\n")[:self.max_response_n_rows]
+                str(e).replace('"', "'")[:self.max_response_n_rows]
             )

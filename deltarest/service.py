@@ -1,6 +1,6 @@
 from overrides import overrides
 
-from flask import Flask, request, Response
+from flask import Flask, request
 
 from .rest import DeltaRESTAdapter
 
@@ -18,14 +18,11 @@ class DeltaRESTService(Flask):
     @overrides
     def run(self, host=None, port=None, debug=None, load_dotenv=True,
             **options):
+
         @self.route('/', defaults={'path': ''})
         @self.route('/<path:path>', methods=['PUT'])
         def handle_put(path):
-            if request.full_path.endswith("?"):
-                uri = request.full_path[:-1]
-            else:
-                uri = request.full_path
-            return self.rest_adapter.put(uri.replace("%20", " "))
+            return self.rest_adapter.put(request.full_path.replace("?", ""))
 
         @self.route('/', defaults={'path': ''})
         @self.route('/<path:path>', methods=['POST'])
@@ -35,9 +32,9 @@ class DeltaRESTService(Flask):
             else:
                 uri = request.full_path
             return self.rest_adapter.post(
-                uri.replace("%20", " "),
+                uri,
                 # parse as json even if content-type is not json
-                request.get_json(force=True)
+                request.get_json(force=True, silent=True)
             )
 
         @self.route('/', defaults={'path': ''})

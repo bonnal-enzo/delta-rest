@@ -128,5 +128,5 @@ class Test(unittest.TestCase):
             )
         )
 
-    # def test_service(self):
-    #     DeltaRESTService(self.root_dir).run("localhost", "4444")
+    def test_service(self):
+        DeltaRESTService(self.root_dir).run("localhost", "4444")
