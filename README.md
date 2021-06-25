@@ -1,4 +1,4 @@
-# delta-rest
+# delta-rest [POC]
 [![Actions Status](https://github.com/enzobnl/delta-rest/workflows/test/badge.svg)](https://github.com/enzobnl/delta-rest/actions) [![Actions Status](https://github.com/enzobnl/delta-rest/workflows/PyPI/badge.svg)](https://github.com/enzobnl/delta-rest/actions)
 
 
@@ -36,7 +36,7 @@ DeltaRESTService(delta_root_path="/tmp/lakehouse-root") \
 Notes:
 When deployed on cluster: 
 - `delta_root_path` could be a cloud storage path. 
-- run `spark-submit` using `client` deployMode.
+- deploy the spark app using `client` deployMode.
 
 ## PUT
 ### Create Delta table with a specific identifier (evolutive schema)
